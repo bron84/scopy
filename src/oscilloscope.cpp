@@ -112,7 +112,9 @@ Oscilloscope::Oscilloscope(struct iio_context *ctx, Filter *filt,
 	nb_ref_channels(0),
 	lastFunctionValid(false),
 	import_error(""),
-	restartFlowCounter(NO_FLOW_BUFFERS)
+	restartFlowCounter(NO_FLOW_BUFFERS),
+	hCursorsEnabled(true),
+	vCursorsEnabled(true)
 {
 	ui->setupUi(this);
 	int triggers_panel = ui->stackedWidget->insertWidget(-1, &trigger_settings);
@@ -1120,7 +1122,15 @@ void Oscilloscope::cursor_panel_init()
 {
 	cr_ui = new Ui::CursorsSettings;
 	cr_ui->setupUi(ui->cursorsSettings);
+	setDynamicProperty(cr_ui->btnLockHorizontal, "use_icon", true);
+	setDynamicProperty(cr_ui->btnLockVertical, "use_icon", true);
 	//cr_ui->posSelect->setStyleSheet("background-color:red;");
+
+	connect(cr_ui->btnLockHorizontal, &QPushButton::toggled,
+		&plot, &CapturePlot::setHorizCursorsLocked);
+	connect(cr_ui->btnLockVertical, &QPushButton::toggled,
+		&plot, &CapturePlot::setVertCursorsLocked);
+
 	cursorsPositionButton = new CustomPlotPositionButton(cr_ui->posSelect);
 
 	connect(cr_ui->hCursorsEnable, SIGNAL(toggled(bool)),
@@ -1134,6 +1144,8 @@ void Oscilloscope::cursor_panel_init()
 	connect(cr_ui->vCursorsEnable, SIGNAL(toggled(bool)),
 		cursor_readouts_ui->VoltageCursors,
 		SLOT(setVisible(bool)));
+	connect(cr_ui->btnNormalTrack, &QPushButton::toggled,
+		this, &Oscilloscope::toggleCursorsMode);
 
 	cr_ui->horizontalSlider->setMaximum(100);
 	cr_ui->horizontalSlider->setMinimum(0);
@@ -1148,6 +1160,29 @@ void Oscilloscope::cursor_panel_init()
 		[=](CustomPlotPositionButton::ReadoutsPosition position){
 		plot.moveCursorReadouts(position);
 	});
+}
+
+void Oscilloscope::toggleCursorsMode(bool toggled)
+{
+	cr_ui->hCursorsEnable->setEnabled(toggled);
+	cr_ui->vCursorsEnable->setEnabled(toggled);
+
+	if (toggled) {
+		plot.setVertCursorsEnabled(hCursorsEnabled);
+		plot.setHorizCursorsEnabled(vCursorsEnabled);
+		cursor_readouts_ui->TimeCursors->setVisible(vCursorsEnabled);
+		cursor_readouts_ui->VoltageCursors->setVisible(hCursorsEnabled);
+	} else {
+		hCursorsEnabled = cr_ui->hCursorsEnable->isChecked();
+		vCursorsEnabled = cr_ui->vCursorsEnable->isChecked();
+		plot.setVertCursorsEnabled(true);
+		plot.setHorizCursorsEnabled(true);
+		cursor_readouts_ui->TimeCursors->setVisible(true);
+		cursor_readouts_ui->VoltageCursors->setVisible(true);
+	}
+
+	cr_ui->btnLockVertical->setEnabled(toggled);
+	plot.trackModeEnabled(toggled);
 }
 
 void Oscilloscope::pause(bool paused)
@@ -1847,6 +1882,7 @@ void Oscilloscope::toggle_blockchain_flow(bool en)
 
 void Oscilloscope::runStopToggled(bool checked)
 {
+
 	QPushButton *btn = static_cast<QPushButton *>(QObject::sender());
 	setDynamicProperty(btn, "running", checked);
 
@@ -3605,6 +3641,8 @@ void Oscilloscope::singleCaptureDone()
 			Q_EMIT isRunning(false);
 		}
 	}
+
+	plot.repositionCursors();
 
 	if(restartFlowCounter == 0) {
 		restartFlowCounter = NO_FLOW_BUFFERS;

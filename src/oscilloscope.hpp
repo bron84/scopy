@@ -206,6 +206,7 @@ namespace adiscope {
 		void resetStreamingFlag(bool);
 		void onFilledScreen(bool, unsigned int);
 
+		void toggleCursorsMode(bool toggled);
 	public Q_SLOTS:
 		void requestAutoset();
 		void enableLabels(bool);
@@ -304,6 +305,9 @@ namespace adiscope {
 		bool statistics_enabled;
 		QList<bool> high_gain_modes;
 		std::vector<double> channel_offset;
+
+		bool hCursorsEnabled;
+		bool vCursorsEnabled;
 
 		std::vector<bool> chnAcCoupled;
 		bool triggerAcCoupled;
